@@ -1,90 +1,34 @@
-import json
+import pandas as pd
 import numpy as np
 
+def compute_entropy(probs):
+    non_zero_probs = probs[probs > 0]
+    return -np.sum(non_zero_probs * np.log2(non_zero_probs))
 
-def get_matrix(str_json: str):
-    clusters = [c if isinstance(c, list) else [c] for c in json.loads(str_json)]
-    n = sum(len(cluster) for cluster in clusters)
+def calculate_information_measures(filename):
+    dataset = pd.read_csv(filename, index_col=0).values
 
-    matrix = [[1] * n for _ in range(n)]
+    total = np.sum(dataset)
+    joint_probs = dataset / total
 
-    worse = []
-    for cluster in clusters:
-        for worse_elem in worse:
-            for elem in cluster:
-                matrix[elem - 1][worse_elem - 1] = 0
-        for elem in cluster:
-            worse.append(int(elem))
+    marginal_a_probs = np.sum(joint_probs, axis=1)
+    marginal_b_probs = np.sum(joint_probs, axis=0)
 
-    return np.array(matrix)
+    joint_entropy = compute_entropy(joint_probs.ravel())
+    entropy_a = compute_entropy(marginal_a_probs)
+    entropy_b = compute_entropy(marginal_b_probs)
 
+    conditional_entropy_b_given_a = joint_entropy - entropy_a
+    mutual_information = entropy_b - conditional_entropy_b_given_a
 
-def get_clusters(matrix, est1, est2):
-    clusters = {}
-
-    num_rows = len(matrix)
-    num_cols = len(matrix[0])
-    excluded_rows = set()
-    for row in range(num_rows):
-        if row + 1 in excluded_rows:
-            continue
-        current_cluster = [row + 1]
-        clusters[row + 1] = current_cluster
-        for col in range(row + 1, num_cols):
-            if matrix[row][col] == 0:
-                current_cluster.append(col + 1)
-                excluded_rows.add(col + 1)
-
-    result = []
-    for k in clusters:
-        if not result:
-            result.append(clusters[k])
-            continue
-
-        for i, elem in enumerate(result):
-            sum_est1_elem = np.sum(est1[elem[0] - 1])
-            sum_est2_elem = np.sum(est2[elem[0] - 1])
-            sum_est1_k = np.sum(est1[k - 1])
-            sum_est2_k = np.sum(est2[k - 1])
-
-            if sum_est1_elem == sum_est1_k and sum_est2_elem == sum_est2_k:
-                for c in clusters[k]:
-                    result[i].append(c)
-                    break
-            if sum_est1_elem < sum_est1_k or sum_est2_elem < sum_est2_k:
-                result = result[:i] + clusters[k] + result[i:]
-                break
-
-        result.append(clusters[k])
-
-    final_result = [r[0] if len(r) == 1 else r for r in result]
-    return final_result
-
-
-def task(string1, string2):
-    matrix1 = get_matrix(string1)
-    matrix2 = get_matrix(string2)
-
-    matrix_and = np.multiply(matrix1, matrix2)
-    matrix_and_t = np.multiply(np.transpose(matrix1), np.transpose(matrix2))
-
-    matrix_or = np.maximum(matrix_and, matrix_and_t)
-    clusters = get_clusters(matrix_or, matrix1, matrix2)
-
-    contradiction_core = []
-    for cluster in clusters:
-        if isinstance(cluster, list) and len(cluster) > 1:
-            contradiction_core.append(cluster)
-
-    return json.dumps(contradiction_core)
-
-
-def main(json1, json2):
-    return task(json1, json2)
-
+    return [
+        round(joint_entropy, 2),
+        round(entropy_a, 2),
+        round(entropy_b, 2),
+        round(conditional_entropy_b_given_a, 2),
+        round(mutual_information, 2),
+    ]
 
 if __name__ == "__main__":
-    string1 = '[1,[2,3],4,[5,6,7],8,9,10]'
-    string2 = '[[1,2],[3,4,5],6,7,9,[8,10]]'
-    result = main(string1, string2)
-    print(result)
+    output = calculate_information_measures("условная-энтропия-данные.csv")
+    print(output)
