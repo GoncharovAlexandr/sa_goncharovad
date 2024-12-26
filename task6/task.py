@@ -68,7 +68,7 @@ def read_json_file(source, default_value):
     except Exception as e:
         return default_value
 
-if __name__ == "__main__":
+def main():
     default_temp_mf = {
         "температура": [
             {"id": "холодно", "points": [[0, 0], [5, 1], [10, 1], [12, 0]]},
@@ -110,3 +110,6 @@ if __name__ == "__main__":
         print(f"Оптимальное значение нагрева: {optimal_heating:.2f}")
     except ValueError as e:
         print(f"Ошибка: {e}")
+
+if __name__ == "__main__":
+    main()
