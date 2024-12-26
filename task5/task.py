@@ -11,6 +11,7 @@ def calculate_information_measures(filename):
     total = np.sum(dataset)
     joint_probs = dataset / total
 
+
     marginal_a_probs = np.sum(joint_probs, axis=1)
     marginal_b_probs = np.sum(joint_probs, axis=0)
 
@@ -29,6 +30,16 @@ def calculate_information_measures(filename):
         round(mutual_information, 2),
     ]
 
+def main():
+
+    filename = "условная-энтропия-данные.csv"
+    try:
+        output = calculate_information_measures(filename)
+        print(output)
+    except FileNotFoundError:
+        print(f"Error: The file '{filename}' was not found.")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
 if __name__ == "__main__":
-    output = calculate_information_measures("условная-энтропия-данные.csv")
-    print(output)
+    main()
