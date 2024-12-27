@@ -3,9 +3,9 @@ import json
 import numpy as np
 import skfuzzy as fuzz
 from skfuzzy import control as ctrl
-import os
 
-def fuzzy_control(temp_mf_json, heat_mf_json, rules_json, current_temp):
+
+def task(temp_mf_json, heat_mf_json, rules_json, current_temp):
     temp_mfs = json.loads(temp_mf_json)
     heat_mfs = json.loads(heat_mf_json)
     rules = json.loads(rules_json)
@@ -57,18 +57,24 @@ def fuzzy_control(temp_mf_json, heat_mf_json, rules_json, current_temp):
         defuzzified_output = fuzz.defuzz(heating.universe, output_mf, 'centroid')
         return defuzzified_output
     else:
-        raise ValueError("Результат рендеринга пуст")
+        raise ValueError("выходная область пуста")
 
-def read_json_file(source, default_value):
+
+def load_json_from_file(file_name, default):
+    """
+    Загружает JSON из файла. Если файл не найден, возвращает значение по умолчанию.
+    """
     try:
-        if os.path.isfile(source):
-            with open(source, 'r') as file:
-                return json.load(file)
-        return json.loads(source)
-    except Exception as e:
-        return default_value
+        with open(file_name, 'r') as file:
+            return json.load(file)
+    except Exception:
+        return default
 
-def main():
+
+def main(temp_file, heat_file, rules_file, current_temp):
+    """
+    Основная функция для выполнения задачи на основе заданных файлов с параметрами.
+    """
     default_temp_mf = {
         "температура": [
             {"id": "холодно", "points": [[0, 0], [5, 1], [10, 1], [12, 0]]},
@@ -91,25 +97,24 @@ def main():
         ['жарко', 'слабый']
     ]
 
-    default_current_temp = 15
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--temp_file', type=str)
-    parser.add_argument('--heat_file', type=str)
-    parser.add_argument('--rules_file', type=str)
-    parser.add_argument('--current_temp', type=int, default=default_current_temp)
-    args = parser.parse_args()
-
-    temp_mf_json = read_json_file(args.temp_file, json.dumps(default_temp_mf))
-    heat_mf_json = read_json_file(args.heat_file, json.dumps(default_heat_mf))
-    rules_json = read_json_file(args.rules_file, json.dumps(default_rules))
-    current_temp = args.current_temp
+    temp_mf_json = json.dumps(load_json_from_file(temp_file, default_temp_mf))
+    heat_mf_json = json.dumps(load_json_from_file(heat_file, default_heat_mf))
+    rules_json = json.dumps(load_json_from_file(rules_file, default_rules))
 
     try:
-        optimal_heating = fuzzy_control(temp_mf_json, heat_mf_json, rules_json, current_temp)
-        print(f"Оптимальное значение нагрева: {optimal_heating:.2f}")
+        optimal_heating = task(temp_mf_json, heat_mf_json, rules_json, current_temp)
+        return f"{optimal_heating:.2f}"
     except ValueError as e:
-        print(f"Ошибка: {e}")
+        return f"Ошибка: {e}"
+
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--temp_file', type=str, help="Файл с функциями принадлежности температуры")
+    parser.add_argument('--heat_file', type=str, help="Файл с функциями принадлежности нагрева")
+    parser.add_argument('--rules_file', type=str, help="Файл с правилами логики")
+    parser.add_argument('--current_temp', type=int, default=15, help="Текущая температура")
+    args = parser.parse_args()
+
+    result = main(args.temp_file, args.heat_file, args.rules_file, args.current_temp)
+    print(result)
