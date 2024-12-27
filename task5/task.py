@@ -1,45 +1,58 @@
-import pandas as pd
+import json
 import numpy as np
 
-def compute_entropy(probs):
-    non_zero_probs = probs[probs > 0]
-    return -np.sum(non_zero_probs * np.log2(non_zero_probs))
 
-def calculate_information_measures(filename):
-    dataset = pd.read_csv(filename, index_col=0).values
+def load_clusters(file_path):
 
-    total = np.sum(dataset)
-    joint_probs = dataset / total
+    with open(file_path, 'r') as f:
+        data = json.load(f)
+
+    cluster_groups = []
+    for group in data:
+        if isinstance(group, list):
+            cluster_groups.append(group)
+        else:
+            cluster_groups.append([group])
+
+    total_elements = sum(len(group) for group in cluster_groups)
+    matrix = np.ones((total_elements, total_elements), dtype=int)
+
+    previous_elements = []
+    for group in cluster_groups:
+        for prior in previous_elements:
+            for current in group:
+                matrix[current - 1, prior - 1] = 0
+        previous_elements.extend(group)
+
+    return matrix
 
 
-    marginal_a_probs = np.sum(joint_probs, axis=1)
-    marginal_b_probs = np.sum(joint_probs, axis=0)
+def extract_conflict_pairs(matrix):
+    conflicting_pairs = []
 
-    joint_entropy = compute_entropy(joint_probs.ravel())
-    entropy_a = compute_entropy(marginal_a_probs)
-    entropy_b = compute_entropy(marginal_b_probs)
+    size = len(matrix)
+    for row in range(size):
+        for col in range(row + 1, size):
+            if matrix[row, col] == 0 and matrix[col, row] == 0:
+                pair = sorted([row + 1, col + 1])
+                if pair not in conflicting_pairs:
+                    conflicting_pairs.append(pair)
 
-    conditional_entropy_b_given_a = joint_entropy - entropy_a
-    mutual_information = entropy_b - conditional_entropy_b_given_a
+    return [pair[0] if len(pair) == 1 else pair for pair in conflicting_pairs]
 
-    return [
-        round(joint_entropy, 2),
-        round(entropy_a, 2),
-        round(entropy_b, 2),
-        round(conditional_entropy_b_given_a, 2),
-        round(mutual_information, 2),
-    ]
 
-def main():
+def main(file_path1, file_path2):
+    matrix1 = load_clusters(file_path1)
+    matrix2 = load_clusters(file_path2)
 
-    filename = "условная-энтропия-данные.csv"
-    try:
-        output = calculate_information_measures(filename)
-        print(output)
-    except FileNotFoundError:
-        print(f"Error: The file '{filename}' was not found.")
-    except Exception as e:
-        print(f"An error occurred: {e}")
+    intersect_matrix = np.multiply(matrix1, matrix2)
+    transposed_intersect = np.multiply(matrix1.T, matrix2.T)
+    combined_matrix = np.maximum(intersect_matrix, transposed_intersect)
 
-if __name__ == "__main__":
-    main()
+    conflicting_clusters = extract_conflict_pairs(combined_matrix)
+    return conflicting_clusters
+
+
+if __name__ == '__main__':
+    result = main("example1.json", "example2.json")
+    print(result)
