@@ -10,11 +10,9 @@ def task(temp_mf_json, heat_mf_json, rules_json, current_temp):
     heat_mfs = json.loads(heat_mf_json)
     rules = json.loads(rules_json)
 
-    min_temp = float('inf')
-    max_temp = float('-inf')
-
-    min_heat = float('inf')
-    max_heat = float('-inf')
+    # Определение диапазонов
+    min_temp, max_temp = float('inf'), float('-inf')
+    min_heat, max_heat = float('inf'), float('-inf')
 
     for state in temp_mfs["температура"]:
         points = state["points"]
@@ -26,12 +24,13 @@ def task(temp_mf_json, heat_mf_json, rules_json, current_temp):
     for state in heat_mfs["уровень нагрева"]:
         points = state["points"]
         for point in points:
-            temperature = point[0]
-            min_heat = min(min_temp, temperature)
-            max_heat = max(max_temp, temperature)
+            heat = point[0]
+            min_heat = min(min_heat, heat)
+            max_heat = max(max_heat, heat)
 
-    temperature = ctrl.Antecedent(np.arange(min_temp, max_temp, 1), 'temperature')
-    heating = ctrl.Consequent(np.arange(min_heat, max_heat, 0.1), 'heating')
+    # Определение функций принадлежности
+    temperature = ctrl.Antecedent(np.arange(min_temp, max_temp + 1, 1), 'temperature')
+    heating = ctrl.Consequent(np.arange(min_heat, max_heat + 0.1, 0.1), 'heating')
 
     for mf in temp_mfs['температура']:
         points = np.array(mf['points'])
@@ -41,6 +40,7 @@ def task(temp_mf_json, heat_mf_json, rules_json, current_temp):
         points = np.array(mf['points'])
         heating[mf['id']] = fuzz.trapmf(heating.universe, [points[0][0], points[1][0], points[2][0], points[3][0]])
 
+    # Обработка правил
     activated_rules = []
     for rule in rules:
         if rule[0] in temperature.terms and rule[1] in heating.terms:
@@ -48,6 +48,8 @@ def task(temp_mf_json, heat_mf_json, rules_json, current_temp):
             if temp_level > 0:
                 activated_rules.append((temp_level, rule[1]))
 
+
+    # Вычисление результата
     output_mf = np.zeros_like(heating.universe)
     for activation_level, heat_term in activated_rules:
         heat_mf = heating[heat_term].mf
@@ -57,13 +59,11 @@ def task(temp_mf_json, heat_mf_json, rules_json, current_temp):
         defuzzified_output = fuzz.defuzz(heating.universe, output_mf, 'centroid')
         return defuzzified_output
     else:
-        raise ValueError("выходная область пуста")
+        print("Выходная область пуста. Возвращено 0.")
+        return 0
 
 
 def load_json_from_file(file_name, default):
-    """
-    Загружает JSON из файла. Если файл не найден, возвращает значение по умолчанию.
-    """
     try:
         with open(file_name, 'r') as file:
             return json.load(file)
@@ -72,9 +72,6 @@ def load_json_from_file(file_name, default):
 
 
 def main(temp_file, heat_file, rules_file, current_temp):
-    """
-    Основная функция для выполнения задачи на основе заданных файлов с параметрами.
-    """
     default_temp_mf = {
         "температура": [
             {"id": "холодно", "points": [[0, 0], [5, 1], [10, 1], [12, 0]]},
